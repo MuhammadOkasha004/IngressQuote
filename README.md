@@ -22,7 +22,6 @@
   <img src="https://img.shields.io/badge/JWT-Auth-000000?style=flat&logo=jsonwebtokens&labelColor=0d1117">
   <img src="https://img.shields.io/badge/BCrypt-Password_Hashing-00b8a9?style=flat&labelColor=0d1117">
   <img src="https://img.shields.io/badge/SMTP-Email_Service-EA4335?style=flat&logo=gmail&labelColor=0d1117">
-  <img src="https://img.shields.io/badge/ApexCharts-Data_Viz-00b8a9?style=flat&logo=chartdotjs&labelColor=0d1117">
 </p>
 
 <br>
@@ -31,7 +30,7 @@
 
 <!-- SEO KEYWORDS -->
 <!--
-ingressquote, vendor management system, quotation management system, blazor server project, asp.net core 9, full stack web application, procurement software, supplier management tool, quotation tracking dashboard, vendor invitation system, email notification procurement, blazor server dashboard with charts, internship project dotnet, full stack developer Pakistan, Teyzix Core internship, vendor quotation management, cost tracking tool, B2B procurement platform, PostgreSQL NeonDB EF Core project, apexcharts dashboard, dark light mode blazor app, activity logging system
+ingressquote, vendor management system, quotation management system, blazor server project, asp.net core 9, full stack web application, procurement software, supplier management tool, quotation tracking dashboard, vendor invitation system, email notification procurement, blazor server dashboard with charts, internship project dotnet, full stack developer Pakistan, Teyzix Core internship, vendor quotation management, cost tracking tool, B2B procurement platform, PostgreSQL NeonDB EF Core project, dark light mode blazor app, activity logging system
 -->
 
 ---
@@ -42,7 +41,7 @@ ingressquote, vendor management system, quotation management system, blazor serv
 
 Instead of scattered spreadsheets and email threads, IngressQuote brings the entire procurement pipeline into one structured dashboard. Admins manage the full system while vendors get their own dedicated portal to view assigned quotations, respond with pricing, and manage their profiles.
 
-The platform supports dual-portal access — **Admin** and **Vendor** — each with role-specific dashboards, activity logs, and data visualization powered by ApexCharts.
+The platform supports dual-portal access — **Admin** and **Vendor** — each with role-specific dashboards, activity logs, and data visualization.
 
 > Built to reflect how real procurement teams actually operate — structured, trackable, and fully auditable.
 
@@ -87,7 +86,6 @@ Most small-to-medium businesses still rely on email and Excel to manage vendor c
 **Frontend**
 - Blazor Server (ASP.NET Core 9.0)
 - Bootstrap 5
-- ApexCharts (dashboard data visualization)
 - Custom dark / light theme system
 
 **Backend**
@@ -102,6 +100,8 @@ Most small-to-medium businesses still rely on email and Excel to manage vendor c
 - Dependency Injection
 - Session-based role management (Admin / Vendor)
 - Protected route components via Blazor auth state
+
+> 🔧 **Charts & Data Visualization** — Working on it. Real-time dashboard charts with live database data are currently under active development.
 
 ---
 
@@ -168,13 +168,13 @@ Both Admin and Vendor dashboards include a **3-row visual layout**:
 Quick summary numbers: total vendors, total quotations, pending approvals, approved this month
 
 **Row 2 — Side-by-Side Charts**
-- **Left:** Donut chart — Quotation Status Overview (Approved / Pending / Rejected)
+- **Left:** Donut chart — Quotation Status Overview (Approved / Pending / Active)
 - **Right:** Horizontal bar chart — Top Vendors by Approvals
 
 **Row 3 — Full Width Chart**
 - Area/line chart — Monthly Quotation Activity (Jan through Dec)
 
-All charts are built with **ApexCharts** and respond to dark/light mode toggle automatically.
+> 🔧 **Working on it** — Charts are being connected to live database data. Real-time data visualization via database queries is currently under active development.
 
 ---
 
@@ -259,6 +259,7 @@ Open **http://localhost:5143** in your browser.
 
 ## 🔮 Future Roadmap
 
+- [ ] Real-time dashboard charts connected to live database data *(in progress)*
 - [ ] Quotation deadline tracker with auto-close on expiry
 - [ ] Smart cost comparison across vendor responses per item
 - [ ] PDF procurement report export
@@ -272,7 +273,7 @@ Open **http://localhost:5143** in your browser.
 ## 👤 Author
 
 **Muhammad Okasha**  
-Software Engineering Student · ASP.NET Core Developer · Full Stack Developer 
+Software Engineering Student · ASP.NET Core Developer · Full Stack Developer
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat&logo=linkedin&labelColor=0d1117)](https://www.linkedin.com/in/muhammadokasha004)
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-333?style=flat&logo=github&labelColor=0d1117)](https://github.com/MuhammadOkasha004)
@@ -287,7 +288,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](./LICEN
 
 <p align="center">
   <strong>⭐ Found IngressQuote useful or impressive? Drop a star!</strong><br>
-  A star costs nothing but means everything. 
+  A star costs nothing but means everything.
 </p>
 
 <p align="center">
