@@ -275,7 +275,7 @@ Open **http://localhost:5143** in your browser.
 **Muhammad Okasha**  
 Software Engineering Student · ASP.NET Core Developer · Full Stack Developer
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat&logo=linkedin&labelColor=0d1117)](https://www.linkedin.com/in/muhammadokasha004)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat&logo=linkedin&labelColor=0d1117)](https://www.linkedin.com/in/muhammad-okasha-0386103aa)
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-333?style=flat&logo=github&labelColor=0d1117)](https://github.com/MuhammadOkasha004)
 
 ---
