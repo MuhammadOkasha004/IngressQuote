@@ -23,8 +23,7 @@ namespace VendorHub.Models.Repositories
         {
             _configuration = configuration;
             _context = context;
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? "Host=ep-plain-waterfall-at1aeg2h-pooler.c-9.us-east-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=npg_HSh1KC9zfnkl;SSL Mode=Require;Trust Server Certificate=true;";
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
         public async Task<bool> RegisterAsync(string username, string email, string password, string role)

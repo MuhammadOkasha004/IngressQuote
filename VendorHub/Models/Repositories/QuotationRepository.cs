@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using VendorHub.Data;
 using VendorHub.Models.Classes;
 
@@ -11,12 +12,13 @@ namespace VendorHub.Models.Repositories
 {
     public class QuotationRepository
     {
-        private readonly string _connectionString = "Host=ep-plain-waterfall-at1aeg2h-pooler.c-9.us-east-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=npg_HSh1KC9zfnkl;SSL Mode=Require;Trust Server Certificate=true;";
+        private readonly string _connectionString;
         private readonly ApplicationDbContext _context;
 
-        public QuotationRepository(ApplicationDbContext context)
+        public QuotationRepository(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
         public async Task<List<QuotationRequest>> GetAllRequestsAsync()

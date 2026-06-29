@@ -1,12 +1,18 @@
 using Npgsql;
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 
 namespace VendorHub.Models.Repositories
 {
     public class AdminDashboardRepository
     {
-        private readonly string _connectionString = "Host=ep-plain-waterfall-at1aeg2h-pooler.c-9.us-east-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=npg_HSh1KC9zfnkl;SSL Mode=Require;Trust Server Certificate=true;";
+        private readonly string _connectionString;
+
+        public AdminDashboardRepository(IConfiguration configuration)
+        {
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
+        }
 
         public List<TopVendorStat> GetTopVendors(int companyId, int count = 5)
         {
