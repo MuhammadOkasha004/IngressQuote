@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="IngressQuote — Vendor Management & Quotation System" src="./VendorHub/wwwroot/logo.png" width="100" style="border-radius: 16px;">
+  <img alt="IngressQuote — Vendor Management & Quotation System" src="./VendorHub/wwwroot/favicon.ico" width="100" style="border-radius: 16px;">
 </p>
 
 <h1 align="center">Ingress<span style="color:#00b8a9">Quote</span></h1>
@@ -272,7 +272,7 @@ Open **http://localhost:5143** in your browser.
 ## 👤 Author
 
 **Muhammad Okasha**  
-Software Engineering Student · ASP.NET Core Developer · Full Stack Developer · TEYZIX CORE
+Software Engineering Student · ASP.NET Core Developer · Full Stack Developer 
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0077B5?style=flat&logo=linkedin&labelColor=0d1117)](https://www.linkedin.com/in/muhammadokasha004)
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-333?style=flat&logo=github&labelColor=0d1117)](https://github.com/MuhammadOkasha004)
@@ -287,8 +287,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](./LICEN
 
 <p align="center">
   <strong>⭐ Found IngressQuote useful or impressive? Drop a star!</strong><br>
-  <sub>Built from scratch during my internship at TEYZIX CORE — every feature thought through, every bug fixed.<br>
-  A star costs nothing but means everything. 🙏</sub>
+  A star costs nothing but means everything. 
 </p>
 
 <p align="center">
