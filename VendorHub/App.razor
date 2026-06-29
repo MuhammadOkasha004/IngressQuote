@@ -1,0 +1,17 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using VendorHub.Components.Layout
+@using VendorHub.Components.Shared
+
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(LoginLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not Found</PageTitle>
+        <LayoutView Layout="@typeof(LoginLayout)">
+            <p role="alert">Sorry, there is nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
+</Router>

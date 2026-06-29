@@ -1,0 +1,36 @@
+using Microsoft.AspNetCore.Mvc;
+using System;
+using VendorHub.Models.Repositories;
+
+namespace VendorHub.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class VendorDashboardController : ControllerBase
+    {
+        private readonly VendorDashboardRepository _repo;
+
+        public VendorDashboardController(VendorDashboardRepository repo)
+        {
+            _repo = repo;
+        }
+
+        [HttpGet("{vendorId}")]
+        public IActionResult GetDashboardStats(int vendorId)
+        {
+            try
+            {
+                var stats = _repo.GetVendorDashboardStats(vendorId);
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[VENDOR API ERROR] Type={ex.GetType().Name} Message={ex.Message}");
+                if (ex.InnerException != null)
+                    Console.Error.WriteLine($"[VENDOR API ERROR] Inner={ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                Console.Error.WriteLine($"[VENDOR API ERROR] StackTrace={ex.StackTrace}");
+                return StatusCode(500, new { message = "An error occurred while fetching vendor stats.", error = ex.Message, errorType = ex.GetType().Name });
+            }
+        }
+    }
+}

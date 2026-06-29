@@ -1,0 +1,76 @@
+using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using VendorHub.Models.Classes;
+using VendorHub.Models.Repositories;
+
+namespace VendorHub.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class VendorController : ControllerBase
+    {
+        private readonly VendorRepository _vendorRepository;
+
+        public VendorController()
+        {
+            _vendorRepository = new VendorRepository();
+        }
+
+        [HttpGet("GetAll")]
+        public IActionResult GetAll()
+        {
+            List<Vendor> vendors = _vendorRepository.GetAllVendors();
+            return Ok(vendors);
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult GetById(int id)
+        {
+            Vendor vendor = _vendorRepository.GetVendorById(id);
+            if (vendor == null)
+                return NotFound(new { message = "Vendor not found!" });
+            return Ok(vendor);
+        }
+
+        [HttpPost("Create")]
+        public IActionResult Create([FromBody] Vendor vendor)
+        {
+            if (vendor == null)
+                return BadRequest(new { message = "Invalid vendor data!" });
+            _vendorRepository.AddVendor(vendor);
+            return Ok(new { message = "Vendor added successfully!" });
+        }
+
+        [HttpPut("{id}")]
+        public IActionResult Update(int id, [FromBody] Vendor vendor)
+        {
+            Vendor existingVendor = _vendorRepository.GetVendorById(id);
+            if (existingVendor == null)
+                return NotFound(new { message = "Vendor not found to update!" });
+            vendor.VendorId = id;
+            _vendorRepository.UpdateVendor(vendor);
+            return Ok(new { message = "Vendor updated successfully!" });
+        }
+
+        [HttpDelete("Delete/{id}")]
+        public IActionResult Delete(int id)
+        {
+            Vendor existingVendor = _vendorRepository.GetVendorById(id);
+            if (existingVendor == null)
+                return NotFound(new { message = "Vendor not found to delete!" });
+            _vendorRepository.DeleteVendor(id);
+            return Ok(new { message = "Vendor deleted successfully!" });
+        }
+
+        [HttpGet("SearchVendors")]
+        public IActionResult SearchVendors([FromQuery] string searchTerm)
+        {
+            List<Vendor> vendors;
+            if (string.IsNullOrEmpty(searchTerm))
+                vendors = _vendorRepository.GetAllVendors();
+            else
+                vendors = _vendorRepository.SearchAndFilterVendors(searchTerm);
+            return Ok(vendors);
+        }
+    }
+}

@@ -1,0 +1,120 @@
+@page "/"
+@using Microsoft.AspNetCore.Components.Web
+@namespace VendorHub.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="~/" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="css/site.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <title>IngressQuote — Your Gateway to Smart Procurement</title>
+</head>
+<body>
+    <component type="typeof(App)" render-mode="Server" />
+
+    <div id="blazor-error-ui" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#EF4444; color:white; padding:0.75rem; z-index:9999;">
+        <span>An error has occurred. Please reload the page.</span>
+        <a href="" style="color:white; text-decoration:underline; margin-left:1rem;">Reload</a>
+        <a class="dismiss" style="color:white; margin-left:1rem; cursor:pointer;">X</a>
+    </div>
+
+    <script>
+        // Dark mode
+        (function () {
+            var saved = localStorage.getItem('theme');
+            if (saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+
+        window.toggleTheme = function () {
+            var html = document.documentElement;
+            var isDark = html.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                html.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+            }
+            isDark = html.getAttribute('data-theme') === 'dark';
+            // update all theme toggle icons
+            document.querySelectorAll('.theme-toggle-icon').forEach(function (el) {
+                el.className = isDark ? 'bi bi-sun theme-toggle-icon' : 'bi bi-moon-stars theme-toggle-icon';
+            });
+            // re-render charts with new theme colors
+            var charts = Object.keys(Chart.instances);
+            charts.forEach(function (key) {
+                var chart = Chart.instances[key];
+                var gridColor = isDark ? '#334155' : '#E5E7EB';
+                var tickColor = isDark ? '#94A3B8' : '#64748B';
+                if (chart.config.type === 'bar' && chart.options.scales) {
+                    chart.options.scales.y.grid.color = gridColor;
+                    chart.options.scales.y.ticks.color = tickColor;
+                    chart.options.scales.x.ticks.color = tickColor;
+                    chart.update();
+                }
+                if (chart.config.type === 'doughnut' && chart.options.plugins && chart.options.plugins.legend) {
+                    chart.options.plugins.legend.labels.color = tickColor;
+                    chart.update();
+                }
+            });
+            return isDark ? 'dark' : 'light';
+        };
+
+        window.getTheme = function () {
+            return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        };
+
+        window.setThemeIcon = function () {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            document.querySelectorAll('.theme-toggle-icon').forEach(function (el) {
+                el.className = isDark ? 'bi bi-sun theme-toggle-icon' : 'bi bi-moon-stars theme-toggle-icon';
+            });
+        };
+
+        window.renderChart = function (canvasId, type, labels, data, colors, suggestedMax) {
+            var ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            console.log('[CHART.JS] Rendering:', canvasId, type, JSON.stringify(labels), JSON.stringify(data));
+            var existing = Chart.getChart(canvasId);
+            if (existing) existing.destroy();
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var gridColor = isDark ? '#334155' : '#E5E7EB';
+            var tickColor = isDark ? '#94A3B8' : '#64748B';
+            var opts = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: type === 'doughnut', position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { family: 'Inter', size: 12 }, color: tickColor } }
+                }
+            };
+            if (type === 'bar') {
+                opts.scales = {
+                    y: { beginAtZero: true, suggestedMax: suggestedMax || undefined, grid: { color: gridColor }, ticks: { font: { family: 'Inter', size: 11 }, color: tickColor, stepSize: 1 } },
+                    x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: tickColor } }
+                };
+            }
+            new Chart(ctx, {
+                type: type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        borderWidth: 0
+                    }]
+                },
+                options: opts
+            });
+        };
+    </script>
+    <script src="_framework/blazor.server.js"></script>
+</body>
+</html>

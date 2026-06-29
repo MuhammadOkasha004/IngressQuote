@@ -1,0 +1,288 @@
+@using VendorHub.Models.Repositories
+@using VendorHub.Models.Classes
+@using VendorHub.Services
+@page "/admin/vendors"
+@layout AdminLayout
+@inject VendorRepository VendorRepo
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 style="color:var(--text-primary);font-weight:700;margin:0;">
+        <span class="bi bi-people me-2" style="color:var(--accent);"></span>Vendors
+    </h3>
+    <div class="d-flex gap-2">
+        <input class="form-control" style="width:220px;" placeholder="Search vendors..." @bind="searchTerm" @oninput="SearchVendors" />
+        <button class="btn btn-primary" @onclick="() => openModal = true">
+            <span class="bi bi-plus-lg"></span> Add Vendor
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div style="color:#FCA5A5;padding:10px;margin-bottom:16px;background:#7F1D1D;border-radius:8px;text-align:center;">
+        @errorMessage
+    </div>
+}
+
+<table class="table-custom">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Company</th>
+            <th>Status</th>
+            <th>Date Added</th>
+            <th>Invite Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var v in vendorList)
+        {
+            <tr>
+                <td>@v.VendorId</td>
+                <td>@v.VendorName</td>
+                <td>@v.EmailAddress</td>
+                <td>@v.CompanyName</td>
+                <td><span class="badge badge-active">Active</span></td>
+                <td>@v.CreatedDate?.ToString("MMM dd, yyyy")</td>
+                <td><span class="badge @(v.IsInvited ? "badge-invited" : "badge-pending")">@(v.IsInvited ? "Invited" : "Pending")</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-accent me-1" @onclick="() => EditVendor(v)"><span class="bi bi-pencil"></span></button>
+                    <button class="btn btn-sm btn-danger me-1" @onclick="() => ConfirmDelete(v.VendorId)"><span class="bi bi-trash"></span></button>
+                    <button class="btn btn-sm btn-secondary" @onclick="() => ResendInvite(v)"><span class="bi bi-send"></span></button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (openModal)
+{
+    <div class="modal-overlay" @onclick="() => openModal = false">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h5>@(isEditing ? "Edit Vendor" : "Add New Vendor")</h5>
+                <button class="modal-close" @onclick="() => openModal = false">&times;</button>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Vendor Name</label>
+                <input class="form-control" @bind="editVendor.VendorName" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input class="form-control" type="email" @bind="editVendor.EmailAddress" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Phone</label>
+                <input class="form-control" @bind="editVendor.ContactNumber" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Company Name</label>
+                <input class="form-control" @bind="editVendor.CompanyName" />
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" @onclick="() => openModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveVendor">@(isEditing ? "Update" : "Save")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showConfirmDelete)
+{
+    <div class="modal-overlay" @onclick="() => showConfirmDelete = false">
+        <div class="modal-content" @onclick:stopPropagation style="max-width:400px;">
+            <div class="modal-header">
+                <h5>Confirm Delete</h5>
+                <button class="modal-close" @onclick="() => showConfirmDelete = false">&times;</button>
+            </div>
+            <p style="color:var(--text-primary);">Are you sure you want to delete this vendor?</p>
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" @onclick="() => showConfirmDelete = false">Cancel</button>
+                <button class="btn btn-danger" @onclick="DeleteVendor">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<VendorRow> vendorList = new();
+    private bool openModal = false;
+    private bool isEditing = false;
+    private bool showConfirmDelete = false;
+    private int deleteId;
+    private string searchTerm = "";
+    private string errorMessage = "";
+    private VendorRow editVendor = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!AuthState.IsLoggedIn)
+            {
+                var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                if (!roleResult.Success || roleResult.Value != "Admin")
+                {
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+                var idResult = await SessionStorage.GetAsync<string>("UserId");
+                var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+                AuthState.SetUser(
+                    idResult.Success ? idResult.Value ?? "" : "",
+                    nameResult.Success ? nameResult.Value ?? "" : "",
+                    roleResult.Value ?? "",
+                    emailResult.Success ? emailResult.Value ?? "" : ""
+                );
+            }
+            try
+            {
+                await LoadVendors();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"VENDORS LOAD ERROR: {ex.Message}");
+                errorMessage = $"Error loading vendors: {ex.Message}";
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task LoadVendors()
+    {
+        var vendors = VendorRepo.GetAllVendors();
+        vendorList = vendors.Select(v => new VendorRow
+        {
+            VendorId = v.VendorId,
+            VendorName = v.VendorName,
+            EmailAddress = v.EmailAddress,
+            ContactNumber = v.ContactNumber,
+            CompanyName = v.CompanyName,
+            CreatedDate = DateTime.UtcNow,
+            IsInvited = false
+        }).ToList();
+        StateHasChanged();
+    }
+
+    private async Task SearchVendors()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                await LoadVendors();
+                return;
+            }
+            var vendors = VendorRepo.SearchAndFilterVendors(searchTerm);
+            vendorList = vendors.Select(v => new VendorRow
+            {
+                VendorId = v.VendorId,
+                VendorName = v.VendorName,
+                EmailAddress = v.EmailAddress,
+                ContactNumber = v.ContactNumber,
+                CompanyName = v.CompanyName,
+                CreatedDate = DateTime.UtcNow,
+                IsInvited = false
+            }).ToList();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SEARCH VENDORS ERROR: {ex.Message}");
+            errorMessage = $"Error searching vendors: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private void EditVendor(VendorRow v)
+    {
+        editVendor = new VendorRow
+        {
+            VendorId = v.VendorId,
+            VendorName = v.VendorName,
+            EmailAddress = v.EmailAddress,
+            ContactNumber = v.ContactNumber,
+            CompanyName = v.CompanyName
+        };
+        isEditing = true;
+        openModal = true;
+    }
+
+    private async Task SaveVendor()
+    {
+        var vendor = new Vendor
+        {
+            VendorName = editVendor.VendorName,
+            EmailAddress = editVendor.EmailAddress,
+            ContactNumber = editVendor.ContactNumber,
+            CompanyName = editVendor.CompanyName,
+            BusinessAddress = "",
+            CompanyId = AuthState.CompanyId
+        };
+        try
+        {
+            if (isEditing)
+            {
+                vendor.VendorId = editVendor.VendorId;
+                VendorRepo.UpdateVendor(vendor);
+            }
+            else
+            {
+                VendorRepo.AddVendor(vendor);
+            }
+            openModal = false;
+            await LoadVendors();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SAVE VENDOR ERROR: {ex.Message}");
+            errorMessage = $"Error saving vendor: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private void ConfirmDelete(int id)
+    {
+        deleteId = id;
+        showConfirmDelete = true;
+    }
+
+    private async Task DeleteVendor()
+    {
+        try
+        {
+            VendorRepo.DeleteVendor(deleteId);
+            showConfirmDelete = false;
+            await LoadVendors();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DELETE VENDOR ERROR: {ex.Message}");
+            errorMessage = $"Error deleting vendor: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResendInvite(VendorRow v)
+    {
+        // Invite functionality not available via repository directly
+    }
+
+    private class VendorRow
+    {
+        public int VendorId { get; set; }
+        public string VendorName { get; set; } = "";
+        public string EmailAddress { get; set; } = "";
+        public string ContactNumber { get; set; } = "";
+        public string CompanyName { get; set; } = "";
+        public DateTime? CreatedDate { get; set; }
+        public bool IsInvited { get; set; }
+    }
+}

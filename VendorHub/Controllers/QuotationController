@@ -1,0 +1,214 @@
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using VendorHub.Models.Classes;
+using VendorHub.Models.Repositories;
+
+namespace VendorHub.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class QuotationController : ControllerBase
+    {
+        private readonly QuotationRepository _quotationRepository;
+
+        public QuotationController()
+        {
+            _quotationRepository = new QuotationRepository();
+        }
+
+        [HttpPost("create-request")]
+        public IActionResult CreateQuotationRequest([FromBody] QuotationRequest request)
+        {
+            if (request == null)
+            {
+                return BadRequest(new { message = "Invalid quotation request data." });
+            }
+
+            try
+            {
+                int requestId = _quotationRepository.CreateQuotationRequest(request);
+                return Ok(new { message = "Quotation request created successfully.", quotationRequestId = requestId });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error creating quotation request.", error = ex.Message });
+            }
+        }
+
+        [HttpPost("assign-to-vendors")]
+        public IActionResult AssignRequestToVendors([FromBody] AssignRequestDto dto)
+        {
+            if (dto == null || dto.Request == null || dto.SelectedVendors == null || dto.SelectedVendors.Count == 0)
+            {
+                return BadRequest(new { message = "Invalid data. Provide a valid request and at least one vendor." });
+            }
+
+            try
+            {
+                _quotationRepository.AssignQuotationRequestToVendors(dto.Request, dto.SelectedVendors);
+                return Ok(new { message = "Quotation request assigned to selected vendors successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error assigning request to vendors.", error = ex.Message });
+            }
+        }
+
+        [HttpPut("submit-response/{quotationId}")]
+        public IActionResult SubmitResponse(int quotationId, [FromQuery] decimal amount)
+        {
+            try
+            {
+                _quotationRepository.SubmitQuotationResponse(quotationId, amount);
+                return Ok(new { message = "Quotation response submitted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error submitting quotation response.", error = ex.Message });
+            }
+        }
+
+        [HttpPut("update-status/{quotationId}")]
+        public IActionResult UpdateStatus(int quotationId, [FromQuery] string status)
+        {
+            if (string.IsNullOrEmpty(status))
+            {
+                return BadRequest(new { message = "Status value cannot be empty." });
+            }
+
+            try
+            {
+                _quotationRepository.UpdateQuotationStatus(quotationId, status);
+                return Ok(new { message = "Quotation status updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error updating quotation status.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("history/company/{companyId}")]
+        public IActionResult GetHistoryByCompany(int companyId)
+        {
+            try
+            {
+                var history = _quotationRepository.GetQuotationHistoryByCompany(companyId);
+                return Ok(history);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching company quotation history.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("history/vendor/{vendorId}")]
+        public IActionResult GetHistoryByVendor(int vendorId)
+        {
+            try
+            {
+                var history = _quotationRepository.GetQuotationHistoryByVendor(vendorId);
+                return Ok(history);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching vendor quotation history.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("compare/{requestId}")]
+        public IActionResult CompareVendors(int requestId)
+        {
+            try
+            {
+                var comparison = _quotationRepository.CompareVendorsByRequestId(requestId);
+                return Ok(comparison);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error processing quotation comparison.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("summary/company/{companyId}")]
+        public IActionResult GetSummaries(int companyId)
+        {
+            try
+            {
+                var summaries = _quotationRepository.GetSimpleQuotationSummaries(companyId);
+                return Ok(summaries);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching quotation summaries.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("cheapest/{requestId}")]
+        public IActionResult GetCheapest(int requestId)
+        {
+            try
+            {
+                var cheapest = _quotationRepository.GetCheapestQuotation(requestId);
+                if (cheapest == null)
+                {
+                    return NotFound(new { message = "No submitted quotations found for this request." });
+                }
+                return Ok(cheapest);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching the lowest quotation.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("track/company/{companyId}")]
+        public IActionResult TrackCompanyQuotations(int companyId)
+        {
+            try
+            {
+                var trackData = _quotationRepository.TrackQuotationsByCompany(companyId);
+                return Ok(trackData);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error tracking quotations.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("GetIncomingResponses")]
+        public IActionResult GetIncomingResponses()
+        {
+            try
+            {
+                var trackData = _quotationRepository.TrackQuotationsByCompany(1);
+                return Ok(trackData);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching incoming responses.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("GetComparisonMatrix")]
+        public IActionResult GetComparisonMatrix()
+        {
+            try
+            {
+                var comparisonData = _quotationRepository.CompareVendorsByRequestId(0);
+                return Ok(comparisonData);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching comparison matrix.", error = ex.Message });
+            }
+        }
+    }
+
+    // Assigning complex payloads handle karne ke liye simple helper DTO class
+    public class AssignRequestDto
+    {
+        public QuotationRequest Request { get; set; } = null!;
+        public List<Vendor> SelectedVendors { get; set; } = null!;
+    }
+}

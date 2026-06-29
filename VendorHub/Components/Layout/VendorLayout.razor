@@ -1,0 +1,107 @@
+@using VendorHub.Services
+@inherits LayoutComponentBase
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+@inject IJSRuntime JS
+
+<div class="page">
+    <div class="sidebar d-flex flex-column">
+        <VendorNavMenu />
+        <div class="sidebar-footer mt-auto">
+            <div class="sidebar-user">
+                <div class="avatar">@initials</div>
+                <div class="user-info">
+                    <div style="font-weight:600;font-size:0.85rem;">@userName</div>
+                    <div style="font-size:0.75rem;color:var(--accent);">Vendor</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <main>
+        <div class="top-row px-4">
+            <span style="color:var(--text-muted);font-size:0.85rem;">
+                <span class="bi bi-clock me-1"></span>@DateTime.Now.ToString("MMM dd, yyyy")
+            </span>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-accent" @onclick="ToggleTheme" title="Toggle dark mode">
+                    <span class="bi bi-moon-stars theme-toggle-icon"></span>
+                </button>
+                <a href="/vendor/profile" class="btn btn-sm btn-outline-accent">
+                    <span class="bi bi-person"></span>
+                </a>
+                <a href="#" @onclick="Logout" class="btn btn-sm btn-danger">
+                    <span class="bi bi-box-arrow-left"></span> Logout
+                </a>
+            </div>
+        </div>
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private string userName = "";
+    private string initials = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (AuthState.IsLoggedIn)
+            {
+                userName = AuthState.UserName;
+            }
+            else
+            {
+                var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                userName = nameResult.Success ? nameResult.Value ?? "" : "Vendor";
+                var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                var idResult = await SessionStorage.GetAsync<string>("UserId");
+                var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+
+                int restoredVendorId = 0;
+                var vendorIdResult = await SessionStorage.GetAsync<string>("VendorId");
+                if (vendorIdResult.Success && int.TryParse(vendorIdResult.Value, out var vid))
+                    restoredVendorId = vid;
+
+                if (roleResult.Success && !string.IsNullOrEmpty(roleResult.Value))
+                {
+                    AuthState.SetUser(
+                        idResult.Success ? idResult.Value ?? "" : "",
+                        userName,
+                        roleResult.Value ?? "",
+                        emailResult.Success ? emailResult.Value ?? "" : "",
+                        1,
+                        restoredVendorId
+                    );
+                }
+            }
+
+            if (!string.IsNullOrEmpty(userName) && userName.Length >= 2)
+                initials = userName[..2].ToUpper();
+            else
+                initials = "A";
+
+            await JS.InvokeVoidAsync("setThemeIcon");
+            StateHasChanged();
+        }
+    }
+
+    private async Task Logout()
+    {
+        AuthState.Clear();
+        await SessionStorage.DeleteAsync("UserId");
+        await SessionStorage.DeleteAsync("UserRole");
+        await SessionStorage.DeleteAsync("UserName");
+        await SessionStorage.DeleteAsync("UserEmail");
+        await SessionStorage.DeleteAsync("VendorId");
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+
+    private async Task ToggleTheme()
+    {
+        await JS.InvokeVoidAsync("toggleTheme");
+    }
+}

@@ -1,0 +1,88 @@
+@using VendorHub.Services
+@inject AuthStateService AuthState
+@inject ProtectedSessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+
+<div class="sidebar-brand">
+    <Logo Size="Logo.LogoSize.Small" />
+</div>
+
+<div style="padding:0.75rem 0;flex:1;">
+    <div style="padding:0 1.25rem;margin-bottom:0.5rem;">
+        <span style="color:var(--text-muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;">Main Menu</span>
+    </div>
+    <NavLink class="nav-link-custom" href="admin/dashboard" Match="NavLinkMatch.All">
+        <span class="bi bi-grid"></span><span>Dashboard</span>
+    </NavLink>
+    <NavLink class="nav-link-custom" href="admin/vendors">
+        <span class="bi bi-people"></span><span>Vendors</span>
+    </NavLink>
+    <NavLink class="nav-link-custom" href="admin/quotations">
+        <span class="bi bi-file-text"></span><span>Quotation Requests</span>
+    </NavLink>
+    <NavLink class="nav-link-custom" href="admin/responses">
+        <span class="bi bi-inbox"></span><span>Vendor Responses</span>
+    </NavLink>
+    <NavLink class="nav-link-custom" href="admin/comparison">
+        <span class="bi bi-bar-chart"></span><span>Smart Comparison</span>
+    </NavLink>
+    <div style="padding:0 1.25rem;margin:0.75rem 0 0.5rem;">
+        <span style="color:var(--text-muted);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;">Account</span>
+    </div>
+    <NavLink class="nav-link-custom" href="admin/profile">
+        <span class="bi bi-person-gear"></span><span>Profile Settings</span>
+    </NavLink>
+    <a class="nav-link-custom" href="#" @onclick="Logout" @onclick:preventDefault>
+        <span class="bi bi-box-arrow-left"></span><span>Logout</span>
+    </a>
+</div>
+
+<div style="padding:1rem 1.25rem;    border-top:1px solid rgba(255,255,255,0.06);">
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:0.85rem;">@GetInitials(userName)</div>
+        <div>
+            <div style="font-size:0.85rem;font-weight:500;color:var(--text-primary);">@userName</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">Administrator</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string userName = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (AuthState.IsLoggedIn)
+            {
+                userName = AuthState.UserName;
+            }
+            else
+            {
+                var result = await SessionStorage.GetAsync<string>("UserName");
+                if (result.Success)
+                    userName = result.Value ?? "";
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task Logout()
+    {
+        AuthState.Clear();
+        await SessionStorage.DeleteAsync("UserId");
+        await SessionStorage.DeleteAsync("UserRole");
+        await SessionStorage.DeleteAsync("UserName");
+        await SessionStorage.DeleteAsync("UserEmail");
+        NavigationManager.NavigateTo("/login", forceLoad: true);
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "A";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return parts[0][0].ToString().ToUpper();
+    }
+}

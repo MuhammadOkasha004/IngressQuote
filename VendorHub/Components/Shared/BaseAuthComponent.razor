@@ -1,0 +1,45 @@
+@using VendorHub.Services
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+
+@code {
+    protected bool _isAuthChecked = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadAuthAsync();
+        }
+    }
+
+    protected async Task LoadAuthAsync()
+    {
+        if (AuthState.IsLoggedIn)
+        {
+            _isAuthChecked = true;
+            return;
+        }
+
+        var userIdResult = await SessionStorage.GetAsync<string>("UserId");
+        var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+        var nameResult = await SessionStorage.GetAsync<string>("UserName");
+        var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+
+        if (roleResult.Success && !string.IsNullOrEmpty(roleResult.Value))
+        {
+            AuthState.SetUser(
+                userIdResult.Success ? userIdResult.Value ?? "" : "",
+                nameResult.Success ? nameResult.Value ?? "" : "",
+                roleResult.Value ?? "",
+                emailResult.Success ? emailResult.Value ?? "" : ""
+            );
+            _isAuthChecked = true;
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

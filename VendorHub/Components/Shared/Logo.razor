@@ -1,0 +1,42 @@
+@* IngressQuote logo: abstract "I" ascending arrow mark + wordmark *@
+
+@if (Size == LogoSize.Small)
+{
+    <span style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="1" width="26" height="26" rx="7" stroke="#3B82F6" stroke-width="1.8" fill="none"/>
+            <path d="M14 8 L14 20 M14 8 L10 12 M14 8 L18 12" stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span style="font-weight:700;font-size:1rem;color:inherit;">IngressQuote</span>
+    </span>
+}
+else if (Size == LogoSize.Large)
+{
+    <span style="display:inline-flex;align-items:center;gap:0.75rem;">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="44" height="44" rx="12" stroke="#3B82F6" stroke-width="2.5" fill="none"/>
+            <path d="M24 12 L24 36 M24 12 L17 19 M24 12 L31 19" stroke="#3B82F6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <div>
+            <div style="font-weight:800;font-size:1.5rem;color:inherit;line-height:1.2;">IngressQuote</div>
+            <div style="font-size:0.8rem;color:var(--text-muted);font-weight:400;">Your Gateway to Smart Procurement</div>
+        </div>
+    </span>
+}
+else
+{
+    <span style="display:inline-flex;align-items:center;gap:0.5rem;">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1.5" y="1.5" width="29" height="29" rx="8" stroke="#3B82F6" stroke-width="2" fill="none"/>
+            <path d="M16 8 L16 24 M16 8 L11 13 M16 8 L21 13" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span style="font-weight:700;font-size:1.1rem;color:inherit;">IngressQuote</span>
+    </span>
+}
+
+@code {
+    [Parameter]
+    public LogoSize Size { get; set; } = LogoSize.Medium;
+
+    public enum LogoSize { Small, Medium, Large }
+}

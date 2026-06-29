@@ -1,0 +1,231 @@
+@using VendorHub.Services
+@using VendorHub.Models.Repositories
+@page "/admin/profile"
+@layout AdminLayout
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+@inject ProfileRepository ProfileRepo
+@inject AuthRepository AuthRepo
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 style="color:var(--text-primary);font-weight:700;margin:0;">
+        <span class="bi bi-person-gear me-2" style="color:var(--accent);"></span>Profile Settings
+    </h3>
+</div>
+
+<div class="card p-4 mb-4" style="max-width:600px;">
+    <h5 style="color:var(--text-primary);font-weight:600;margin-bottom:1rem;">Account Information</h5>
+    <div class="mb-3">
+        <label class="form-label">Full Name</label>
+        <input class="form-control" @bind="fullName" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input class="form-control" @bind="email" readonly style="opacity:0.7;" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Company Name</label>
+        <input class="form-control" @bind="companyName" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Phone</label>
+        <input class="form-control" @bind="phone" />
+    </div>
+    <button class="btn btn-primary" @onclick="SaveProfile">Save Changes</button>
+    @if (!string.IsNullOrEmpty(saveMessage))
+    {
+        <div class="mt-3" style="color:var(--accent);">@saveMessage</div>
+    }
+</div>
+
+<div class="card p-4 mb-4" style="max-width:600px;">
+    <h5 style="color:var(--text-primary);font-weight:600;margin-bottom:1rem;">Email Sending Settings</h5>
+    <p style="color:#94A3B8;font-size:14px;margin-bottom:1rem;">
+        Configure your Gmail account to send invitation emails to vendors. 
+        Each company uses their own Gmail account for sending.
+    </p>
+    <div class="mb-3">
+        <label class="form-label">Your Gmail Address</label>
+        <input type="email" class="form-control" @bind="smtpEmail" placeholder="you@gmail.com" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Gmail App Password</label>
+        <input type="password" class="form-control" @bind="smtpAppPassword" placeholder="16-character app password" />
+        <small style="color:#64748B;font-size:12px;margin-top:4px;display:block;">
+            Generate an App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#14B8A6;">myaccount.google.com/apppasswords</a>
+            after enabling 2-Step Verification on this Gmail account.
+        </small>
+    </div>
+    <button class="btn btn-primary" @onclick="SaveEmailSettings" disabled="@isSavingEmail">
+        @(isSavingEmail ? "Saving..." : "Save Email Settings")
+    </button>
+    @if (!string.IsNullOrEmpty(emailSettingsMessage))
+    {
+        <div class="mt-3" style="color:var(--accent);">@emailSettingsMessage</div>
+    }
+</div>
+
+<div class="card p-4" style="max-width:600px;">
+    <h5 style="color:var(--text-primary);font-weight:600;margin-bottom:1rem;">Change Password</h5>
+    <div class="mb-3">
+        <label class="form-label">Current Password</label>
+        <input class="form-control" type="password" @bind="currentPassword" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">New Password</label>
+        <input class="form-control" type="password" @bind="newPassword" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Confirm New Password</label>
+        <input class="form-control" type="password" @bind="confirmPassword" />
+    </div>
+    <button class="btn btn-primary" @onclick="ChangePassword" disabled="@isLoading">@(isLoading ? "Updating..." : "Update Password")</button>
+    @if (!string.IsNullOrEmpty(pwdMessage))
+    {
+        <div class="mt-3" style="color:@(isPwdError ? "var(--danger)" : "var(--accent)");">@pwdMessage</div>
+    }
+</div>
+
+@code {
+    private string fullName = "";
+    private string email = "";
+    private string companyName = "";
+    private string phone = "";
+    private string smtpEmail = "";
+    private string smtpAppPassword = "";
+    private string currentPassword = "";
+    private string newPassword = "";
+    private string confirmPassword = "";
+    private string saveMessage = "";
+    private string emailSettingsMessage = "";
+    private string pwdMessage = "";
+    private bool isPwdError = false;
+    private bool isLoading = false;
+    private bool isSavingEmail = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!AuthState.IsLoggedIn)
+            {
+                var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                if (!roleResult.Success || roleResult.Value != "Admin")
+                {
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+                var idResult = await SessionStorage.GetAsync<string>("UserId");
+                var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+                AuthState.SetUser(
+                    idResult.Success ? idResult.Value ?? "" : "",
+                    nameResult.Success ? nameResult.Value ?? "" : "",
+                    roleResult.Value ?? "",
+                    emailResult.Success ? emailResult.Value ?? "" : ""
+                );
+            }
+
+            fullName = AuthState.UserName;
+            email = AuthState.UserEmail;
+
+            var creds = await AuthRepo.GetSmtpCredentialsAsync(int.Parse(AuthState.UserId));
+            smtpEmail = creds.SmtpEmail ?? "";
+            smtpAppPassword = creds.SmtpAppPassword ?? "";
+
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        saveMessage = "Profile updated successfully.";
+    }
+
+    private async Task SaveEmailSettings()
+    {
+        if (string.IsNullOrWhiteSpace(smtpEmail) || !smtpEmail.Contains('@'))
+        {
+            emailSettingsMessage = "Please enter a valid Gmail address.";
+            StateHasChanged();
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(smtpAppPassword) || smtpAppPassword.Length < 8)
+        {
+            emailSettingsMessage = "Please enter a valid Gmail App Password (at least 8 characters).";
+            StateHasChanged();
+            return;
+        }
+
+        isSavingEmail = true;
+        emailSettingsMessage = "";
+        StateHasChanged();
+
+        try
+        {
+            var userId = int.Parse(AuthState.UserId);
+            var result = await AuthRepo.UpdateSmtpCredentialsAsync(userId, smtpEmail, smtpAppPassword);
+            if (result)
+            {
+                emailSettingsMessage = "Email settings saved successfully. You can now send invitations from this Gmail account.";
+            }
+            else
+            {
+                emailSettingsMessage = "Failed to save email settings. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SAVE SMTP ERROR: {ex.Message}");
+            emailSettingsMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSavingEmail = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChangePassword()
+    {
+        isLoading = true;
+        pwdMessage = "";
+        try
+        {
+            if (newPassword != confirmPassword)
+            {
+                isPwdError = true;
+                pwdMessage = "Passwords do not match.";
+                return;
+            }
+            if (newPassword.Length < 6)
+            {
+                isPwdError = true;
+                pwdMessage = "Password must be at least 6 characters.";
+                return;
+            }
+            var hashed = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            var result = ProfileRepo.UpdatePassword(email, hashed);
+            if (result)
+            {
+                isPwdError = false;
+                pwdMessage = "Password updated successfully.";
+                currentPassword = "";
+                newPassword = "";
+                confirmPassword = "";
+            }
+            else
+            {
+                isPwdError = true;
+                pwdMessage = "Failed to update password.";
+            }
+        }
+        catch
+        {
+            isPwdError = true;
+            pwdMessage = "An error occurred.";
+        }
+        finally { isLoading = false; }
+    }
+}

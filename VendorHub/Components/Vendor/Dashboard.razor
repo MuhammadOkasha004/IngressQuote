@@ -1,0 +1,210 @@
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@page "/vendor/dashboard"
+@attribute [Authorize(Roles = "Vendor")]
+@layout VendorLayout
+@inject HttpClient Http
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject ProtectedSessionStorage SessionStorage
+
+@if (loading)
+{
+    <div class="dash-loading">
+        <div class="spinner"></div>
+        <span>Loading your workspace...</span>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-row gap-3 align-items-stretch mb-4 flex-wrap">
+        <div class="metric-card metric-card--vendors">
+            <div class="metric-card__icon metric-card__icon--green">
+                <span class="bi bi-envelope-open"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.TotalRequestsSent ?? 0)</span>
+                <span class="metric-card__label">Invites</span>
+            </div>
+        </div>
+        <div class="metric-card metric-card--active">
+            <div class="metric-card__icon metric-card__icon--amber">
+                <span class="bi bi-send-check"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.SubmittedQuotes ?? 0)</span>
+                <span class="metric-card__label">Bids</span>
+            </div>
+        </div>
+        <div class="metric-card metric-card--pending">
+            <div class="metric-card__icon metric-card__icon--yellow">
+                <span class="bi bi-hourglass-split"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.SubmittedResponses ?? 0)</span>
+                <span class="metric-card__label">Review</span>
+            </div>
+        </div>
+        <div class="metric-card metric-card--approved">
+            <div class="metric-card__icon metric-card__icon--mint">
+                <span class="bi bi-trophy"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.WonOrders ?? 0)</span>
+                <span class="metric-card__label">Won</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="chart-card">
+                <h5 class="chart-card-title">
+                    <span class="bi bi-pie-chart me-2" style="color:var(--accent);"></span>Bid Success Rate
+                </h5>
+                @{
+                    var submitted = stats?.SubmittedQuotes ?? 0;
+                    var won = stats?.WonOrders ?? 0;
+                    var rate = submitted > 0 ? Math.Round((double)won / submitted * 100, 1) : 0.0;
+                    var ringDeg = rate / 100 * 360;
+                }
+                <div class="donut-wrapper">
+                    <div class="donut" style="background: conic-gradient(#00E676 0deg @(ringDeg)deg, rgba(255,255,255,0.08) @(ringDeg)deg 360deg);">
+                        <div class="donut-hole">
+                            <span class="donut-total" style="color:#00E676;">@rate%</span>
+                            <span class="donut-total-label">Success Rate</span>
+                        </div>
+                    </div>
+                    <div class="donut-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background:#00E676;"></span>
+                            <span>Won (@won)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background:rgba(255,255,255,0.08);"></span>
+                            <span>Remaining (@(submitted - won))</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-card">
+                <h5 class="chart-card-title">
+                    <span class="bi bi-bar-chart me-2" style="color:var(--accent);"></span>Pricing Competitiveness Scale
+                </h5>
+                @{
+                    var avgBid = stats?.AvgBidPrice ?? 0;
+                    var avgBudget = stats?.AvgBudget ?? 0;
+                    var bidPct = avgBudget > 0 ? Math.Min((double)avgBid / (double)avgBudget * 100, 100) : 0;
+                    var withinBudget = avgBudget > 0 && avgBid <= avgBudget;
+                    var barColor = withinBudget ? "#00E676" : "#FF5252";
+                    var barLabel = withinBudget ? "Within Budget Threshold" : "Exceeds Budget Threshold";
+                }
+                <div class="pricing-wrapper">
+                    <div class="pricing-summary">
+                        <div class="pricing-row">
+                            <span class="pricing-label">Your Avg Bid</span>
+                            <span class="pricing-value">$@avgBid.ToString("N2")</span>
+                        </div>
+                        <div class="pricing-row">
+                            <span class="pricing-label">Market Budget Avg</span>
+                            <span class="pricing-value">$@avgBudget.ToString("N2")</span>
+                        </div>
+                    </div>
+                    <div class="pricing-bar-section">
+                        <div class="pricing-bar-header">
+                            <span>@(avgBudget > 0 ? Math.Round((double)avgBid / (double)avgBudget * 100, 1) : 0)% of budget</span>
+                            <span style="color:@barColor;font-weight:600;">@barLabel</span>
+                        </div>
+                        <div class="pricing-track">
+                            <div class="pricing-fill" style="width:@(bidPct.ToString("F1"))%;background:@barColor;">
+                                <span class="pricing-fill-value">$@avgBid.ToString("N0")</span>
+                            </div>
+                        </div>
+                        <div class="pricing-track-labels">
+                            <span>$0</span>
+                            <span>$@avgBudget.ToString("N0")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private VendorDashboardStats? stats;
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!AuthState.IsLoggedIn)
+            {
+                var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                if (!roleResult.Success || roleResult.Value != "Vendor")
+                {
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+                var idResult = await SessionStorage.GetAsync<string>("UserId");
+                var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+
+                int restoredVendorId = 0;
+                var vendorIdResult = await SessionStorage.GetAsync<string>("VendorId");
+                if (vendorIdResult.Success && int.TryParse(vendorIdResult.Value, out var vid))
+                    restoredVendorId = vid;
+
+                AuthState.SetUser(
+                    idResult.Success ? idResult.Value ?? "" : "",
+                    nameResult.Success ? nameResult.Value ?? "" : "",
+                    roleResult.Value ?? "",
+                    emailResult.Success ? emailResult.Value ?? "" : "",
+                    1,
+                    restoredVendorId
+                );
+            }
+
+            var vendorId = AuthState.VendorId;
+            if (vendorId <= 0)
+            {
+                loading = false;
+                StateHasChanged();
+                return;
+            }
+
+            try
+            {
+                var response = await Http.GetAsync($"api/VendorDashboard/{vendorId}");
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[VENDOR DASHBOARD] HTTP {(int)response.StatusCode}: {body}");
+                    return;
+                }
+                stats = await response.Content.ReadFromJsonAsync<VendorDashboardStats>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VENDOR DASHBOARD] Error Type={ex.GetType().Name} Message={ex.Message}");
+                if (ex.InnerException != null)
+                    Console.WriteLine($"[VENDOR DASHBOARD] Inner={ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+            }
+            finally
+            {
+                loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+}

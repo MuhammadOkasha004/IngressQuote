@@ -1,0 +1,173 @@
+@using VendorHub.Models.Repositories
+@using VendorHub.Services
+@page "/vendor/register"
+@layout LoginLayout
+@inject AuthRepository AuthService
+@inject InvitationRepository InvitationRepo
+@inject NavigationManager Navigation
+
+<div class="split-auth">
+    <div class="split-auth-left">
+        <div class="auth-top-logo">
+            <Logo Size="Logo.LogoSize.Medium" />
+        </div>
+        <div class="auth-content">
+            <h1 class="auth-heading">IngressQuote</h1>
+            <p class="auth-subheading">Your Gateway to Smart Procurement</p>
+            <p class="auth-description">Compare vendor quotes, manage procurement requests, and make data-driven purchasing decisions — all from one streamlined platform.</p>
+        </div>
+        <div class="quote-box">
+            <div class="quote-text">"Join a network of trusted vendors and grow your business through meaningful procurement partnerships."</div>
+            <div class="quote-author">— IngressQuote</div>
+        </div>
+        <div class="auth-footer-text">&copy; @DateTime.Now.Year IngressQuote. All rights reserved.</div>
+    </div>
+    <div class="split-auth-right">
+        <div class="form-card">
+            <h3>Complete Registration</h3>
+            <div class="form-subtitle">Set up your vendor account</div>
+            @if (tokenError)
+            {
+                <div style="color:#FCA5A5;text-align:center;padding:1rem;background:#7F1D1D;border-radius:8px;">@message</div>
+            }
+            else if (isVerifying)
+            {
+                <div style="color:#93C5FD;text-align:center;padding:1rem;background:#1E3A5F;border-radius:8px;">Verifying invitation...</div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <label class="form-label">Full Name</label>
+                    <input class="form-control" @bind="fullName" placeholder="Your full name" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input class="form-control" @bind="email" readonly />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" @bind="password" placeholder="Min 8 characters" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Confirm Password</label>
+                    <input type="password" class="form-control" @bind="confirmPassword" placeholder="Confirm password" />
+                </div>
+                <button class="btn btn-primary w-100" @onclick="ProcessRegistration" disabled="@isLoading">
+                    @(isLoading ? "Processing..." : "Complete Registration")
+                </button>
+                @if (!string.IsNullOrEmpty(message))
+                {
+                    <div class="mt-3" style="color:@(isError ? "#FCA5A5" : "#D1FAE5");padding:10px;background:@(isError ? "#7F1D1D" : "#065F46");border-radius:8px;text-align:center;">@message</div>
+                }
+            }
+            <div style="text-align:center;margin-top:1.5rem;">
+                <a href="/login" class="auth-link" style="font-size:0.85rem;">Already registered? Sign In</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string token { get; set; } = "";
+
+    private string fullName = "";
+    private string email = "";
+    private string password = "";
+    private string confirmPassword = "";
+    private string message = "";
+    private bool isError = false;
+    private bool tokenError = false;
+    private bool isVerifying = true;
+    private bool isLoading = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (string.IsNullOrEmpty(token))
+            {
+                tokenError = true;
+                message = "Invalid or missing registration token.";
+                isVerifying = false;
+                StateHasChanged();
+                return;
+            }
+
+            try
+            {
+                var invitation = await InvitationRepo.GetByTokenAsync(token);
+                if (invitation == null || invitation.IsUsed || invitation.ExpiresAt < DateTime.UtcNow)
+                {
+                    tokenError = true;
+                    message = "This invitation link is invalid or has expired.";
+                }
+                else
+                {
+                    fullName = invitation.VendorName;
+                    email = invitation.Email;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TOKEN VERIFY ERROR: {ex.Message}");
+                tokenError = true;
+                message = "Error verifying invitation token.";
+            }
+            finally
+            {
+                isVerifying = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task ProcessRegistration()
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            isError = true;
+            message = "Full name is required.";
+            return;
+        }
+        if (password != confirmPassword)
+        {
+            isError = true;
+            message = "Passwords do not match.";
+            return;
+        }
+        if (password.Length < 8)
+        {
+            isError = true;
+            message = "Password must be at least 8 characters.";
+            return;
+        }
+        isLoading = true;
+        try
+        {
+            var result = await AuthService.RegisterAsync(fullName, email, password, "Vendor");
+            if (result)
+            {
+                await InvitationRepo.MarkAsUsedAsync(token);
+                isError = false;
+                message = "Registration successful! Redirecting to login...";
+                StateHasChanged();
+                await Task.Delay(1500);
+                Navigation.NavigateTo("/login");
+            }
+            else
+            {
+                isError = true;
+                message = "Registration failed. Email may already be registered.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"REGISTER ERROR: {ex.Message}");
+            isError = true;
+            message = "An error occurred during registration.";
+        }
+        finally { isLoading = false; StateHasChanged(); }
+    }
+}

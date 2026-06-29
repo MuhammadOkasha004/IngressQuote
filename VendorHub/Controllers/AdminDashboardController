@@ -1,0 +1,46 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using VendorHub.Models.Classes;
+using VendorHub.Models.Repositories;
+
+namespace VendorHub.Controllers
+{
+    [Authorize(Roles = "Admin")]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class AdminDashboardController : ControllerBase
+    {
+        private readonly AdminDashboardRepository _repo = new AdminDashboardRepository();
+        private readonly ActivityLogRepository _activityRepo = new ActivityLogRepository();
+
+        [HttpGet("{companyId}")]
+        public IActionResult GetDashboardStats(int companyId)
+        {
+            try
+            {
+                var stats = _repo.GetAdminDashboardStats(companyId);
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching admin stats.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("activities/{companyId}")]
+        public IActionResult GetRecentActivities(int companyId)
+        {
+            try
+            {
+                var activities = _activityRepo.GetRecentActivities(companyId, 5);
+                return Ok(activities);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching activities.", error = ex.Message });
+            }
+        }
+    }
+}

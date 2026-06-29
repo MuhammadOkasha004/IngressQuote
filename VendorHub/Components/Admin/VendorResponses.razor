@@ -1,0 +1,103 @@
+@using VendorHub.Models.Repositories
+@using VendorHub.Models.Classes
+@using VendorHub.Services
+@page "/admin/responses"
+@layout AdminLayout
+@inject InvitationRepository InvitationRepo
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 style="color:var(--text-primary);font-weight:700;margin:0;">
+        <span class="bi bi-inbox me-2" style="color:var(--accent);"></span>Vendor Responses
+    </h3>
+</div>
+
+@if (isLoading)
+{
+    <div style="color:#14B8A6;text-align:center;padding:40px;">
+        Loading responses...
+    </div>
+}
+else if (responses == null || !responses.Any())
+{
+    <div style="color:#E2E8F0;text-align:center;padding:40px;background:#1E293B;border-radius:12px;">
+        No responses yet. Invite vendors to submit quotations.
+    </div>
+}
+else
+{
+    <table class="table-custom">
+        <thead>
+            <tr>
+                <th>Vendor</th>
+                <th>Quotation Title</th>
+                <th>Price</th>
+                <th>Delivery Days</th>
+                <th>Notes</th>
+                <th>Submitted Date</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in responses)
+            {
+                <tr>
+                    <td style="font-weight:600;">@(r.Vendor?.VendorName ?? $"Vendor #{r.VendorId}")</td>
+                    <td>@(r.QuotationRequest?.Title ?? $"Request #{r.QuotationRequestId}")</td>
+                    <td style="font-weight:600;color:var(--accent);">$@r.Price.ToString("F2")</td>
+                    <td>@r.DeliveryDays days</td>
+                    <td>@(r.Notes ?? "—")</td>
+                    <td>@r.SubmittedAt.ToString("MMM dd, yyyy h:mm tt")</td>
+                    <td><span class="badge badge-@r.Status.ToLower()">@r.Status</span></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<VendorResponse> responses = new();
+    private bool isLoading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                if (!AuthState.IsLoggedIn)
+                {
+                    var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                    if (!roleResult.Success || roleResult.Value != "Admin")
+                    {
+                        NavigationManager.NavigateTo("/login", forceLoad: true);
+                        return;
+                    }
+                    var idResult = await SessionStorage.GetAsync<string>("UserId");
+                    var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                    var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+                    AuthState.SetUser(
+                        idResult.Success ? idResult.Value ?? "" : "",
+                        nameResult.Success ? nameResult.Value ?? "" : "",
+                        roleResult.Value ?? "",
+                        emailResult.Success ? emailResult.Value ?? "" : ""
+                    );
+                }
+
+                responses = await InvitationRepo.GetAllResponsesAsync();
+                Console.WriteLine($"Responses loaded: {responses.Count}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"RESPONSES ERROR: {ex.Message}");
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+}

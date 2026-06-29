@@ -1,0 +1,200 @@
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authorization
+@page "/admin/dashboard"
+@attribute [Authorize(Roles = "Admin")]
+@layout AdminLayout
+@inject HttpClient Http
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+@inject ProtectedSessionStorage SessionStorage
+
+@if (loading)
+{
+    <div class="dash-loading">
+        <div class="spinner"></div>
+        <span>Loading control panel...</span>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-row gap-3 align-items-stretch mb-4 flex-wrap">
+        <div class="metric-card metric-card--vendors">
+            <div class="metric-card__icon metric-card__icon--green">
+                <span class="bi bi-people"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.TotalVendors ?? 0)</span>
+                <span class="metric-card__label">Vendors</span>
+            </div>
+        </div>
+        <div class="metric-card metric-card--active">
+            <div class="metric-card__icon metric-card__icon--amber">
+                <span class="bi bi-file-earmark-text"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.ActiveQuotations ?? 0)</span>
+                <span class="metric-card__label">Active</span>
+            </div>
+        </div>
+        <div class="metric-card metric-card--pending">
+            <div class="metric-card__icon metric-card__icon--yellow">
+                <span class="bi bi-clock-history"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.PendingQuotations ?? 0)</span>
+                <span class="metric-card__label">Pending</span>
+            </div>
+        </div>
+        <div class="metric-card metric-card--approved">
+            <div class="metric-card__icon metric-card__icon--mint">
+                <span class="bi bi-check-circle"></span>
+            </div>
+            <div class="metric-card__body">
+                <span class="metric-card__value">@(stats?.ApprovedQuotations ?? 0)</span>
+                <span class="metric-card__label">Approved</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="chart-card">
+                <h5 class="chart-card-title">
+                    <span class="bi bi-pie-chart me-2" style="color:var(--accent);"></span>Quotation Status Overview
+                </h5>
+                <div class="donut-wrapper">
+                    <div class="donut" style="background: conic-gradient(
+                        #00E676 0deg @approvedDeg,
+                        #FF9800 @approvedDeg @pendingDeg,
+                        #EF5350 @pendingDeg 360deg
+                    );">
+                        <div class="donut-hole">
+                            <span class="donut-total">@(total)</span>
+                            <span class="donut-total-label">Total</span>
+                        </div>
+                    </div>
+                    <div class="donut-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background:#00E676;"></span>
+                            <span>Approved (@(stats?.ApprovedQuotations ?? 0))</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background:#FF9800;"></span>
+                            <span>Pending (@(stats?.PendingQuotations ?? 0))</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background:#EF5350;"></span>
+                            <span>Rejected (0)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="chart-card">
+                <h5 class="chart-card-title">
+                    <span class="bi bi-bar-chart me-2" style="color:var(--accent);"></span>Top Vendors by Approvals
+                </h5>
+                @if (topVendors != null && topVendors.Any())
+                {
+                    var maxCount = topVendors.Max(v => v.ResponseCount);
+                    <div class="hbar-chart">
+                        @foreach (var vendor in topVendors)
+                        {
+                            var pct = maxCount > 0 ? (double)vendor.ResponseCount / maxCount * 100 : 0;
+                            <div class="hbar-row">
+                                <span class="hbar-label" title="@vendor.VendorName">@vendor.VendorName</span>
+                                <div class="hbar-track">
+                                    <div class="hbar-fill" style="width:@(pct.ToString("F1"))%;">
+                                        <span class="hbar-value">@vendor.ResponseCount</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="chart-empty">No vendor response data yet.</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private AdminDashboardStats? stats;
+    private List<TopVendorStat> topVendors = new();
+    private bool loading = true;
+
+    private double total => (stats?.ActiveQuotations ?? 0) + (stats?.PendingQuotations ?? 0) + (stats?.ApprovedQuotations ?? 0);
+    private double approvedDeg => total > 0 ? (double)(stats?.ApprovedQuotations ?? 0) / total * 360 : 0;
+    private double pendingDeg => total > 0 ? (double)((stats?.ApprovedQuotations ?? 0) + (stats?.PendingQuotations ?? 0)) / total * 360 : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!AuthState.IsLoggedIn)
+            {
+                var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                if (!roleResult.Success || roleResult.Value != "Admin")
+                {
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+                var idResult = await SessionStorage.GetAsync<string>("UserId");
+                var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+                AuthState.SetUser(
+                    idResult.Success ? idResult.Value ?? "" : "",
+                    nameResult.Success ? nameResult.Value ?? "" : "",
+                    roleResult.Value ?? "",
+                    emailResult.Success ? emailResult.Value ?? "" : ""
+                );
+            }
+
+            try
+            {
+                var companyId = AuthState.CompanyId;
+                var response = await Http.GetAsync($"api/AdminDashboard/{companyId}");
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"[ADMIN DASHBOARD] HTTP {(int)response.StatusCode}: {body}");
+                    return;
+                }
+                var result = await response.Content.ReadFromJsonAsync<AdminDashboardResponse>();
+                if (result != null)
+                {
+                    stats = result.stats;
+                    topVendors = result.topVendors ?? new();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ADMIN DASHBOARD] Error Type={ex.GetType().Name} Message={ex.Message}");
+                if (ex.InnerException != null)
+                    Console.WriteLine($"[ADMIN DASHBOARD] Inner={ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+            }
+            finally
+            {
+                loading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private class AdminDashboardResponse
+    {
+        public AdminDashboardStats? stats { get; set; }
+        public List<TopVendorStat>? topVendors { get; set; }
+    }
+}

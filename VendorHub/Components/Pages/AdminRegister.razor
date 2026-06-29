@@ -1,0 +1,116 @@
+@using VendorHub.Models.Repositories
+@page "/admin/register"
+@layout LoginLayout
+@inject AuthRepository AuthService
+@inject NavigationManager NavigationManager
+
+<div class="split-auth">
+    <div class="split-auth-left">
+        <div class="auth-top-logo">
+            <Logo Size="Logo.LogoSize.Medium" />
+        </div>
+        <div class="auth-content">
+            <h1 class="auth-heading">IngressQuote</h1>
+            <p class="auth-subheading">Your Gateway to Smart Procurement</p>
+            <p class="auth-description">Compare vendor quotes, manage procurement requests, and make data-driven purchasing decisions — all from one streamlined platform.</p>
+        </div>
+        <div class="quote-box">
+            <div class="quote-text">"Streamline your procurement process, connect with trusted vendors, and make smarter purchasing decisions — all from one platform."</div>
+            <div class="quote-author">— IngressQuote</div>
+        </div>
+        <div class="auth-footer-text">&copy; @DateTime.Now.Year IngressQuote. All rights reserved.</div>
+    </div>
+    <div class="split-auth-right">
+        <div class="form-card">
+            <h3>Admin Registration</h3>
+            <div class="form-subtitle">Create your administrator account</div>
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input class="form-control" @bind="fullName" placeholder="Enter your full name" />
+                @if (!string.IsNullOrEmpty(nameError)) { <div class="validation-error">@nameError</div> }
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email Address</label>
+                <input type="email" class="form-control" @bind="email" placeholder="Enter your email" />
+                @if (!string.IsNullOrEmpty(emailError)) { <div class="validation-error">@emailError</div> }
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-control" @bind="password" placeholder="Min 8 characters" />
+                @if (!string.IsNullOrEmpty(passwordError)) { <div class="validation-error">@passwordError</div> }
+            </div>
+            <button type="button" class="btn btn-primary w-100" @onclick="HandleRegister" disabled="@isLoading">
+                @(isLoading ? "Creating Account..." : "Create Account")
+            </button>
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <div style="color:#D1FAE5;padding:10px;margin-top:10px;background:#065F46;border-radius:8px;text-align:center;">@successMessage</div>
+            }
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div style="color:#FCA5A5;padding:10px;margin-top:10px;background:#7F1D1D;border-radius:8px;text-align:center;">@errorMessage</div>
+            }
+            <div style="text-align:center;margin-top:1.5rem;">
+                <span style="color:#94A3B8;font-size:0.85rem;">Already have an account?</span>
+                <a href="/login" class="auth-link" style="font-size:0.85rem;margin-left:0.5rem;">Sign In</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string fullName = "";
+    private string email = "";
+    private string password = "";
+    private string successMessage = "";
+    private string errorMessage = "";
+    private bool isLoading = false;
+    private string nameError = "";
+    private string emailError = "";
+    private string passwordError = "";
+
+    private bool Validate()
+    {
+        bool valid = true;
+        if (string.IsNullOrWhiteSpace(fullName)) { nameError = "Name is required."; valid = false; } else { nameError = ""; }
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains("@")) { emailError = "Valid email is required."; valid = false; } else { emailError = ""; }
+        if (password.Length < 8) { passwordError = "Password must be at least 8 characters."; valid = false; } else { passwordError = ""; }
+        return valid;
+    }
+
+    private async Task HandleRegister()
+    {
+        if (!Validate()) return;
+        try
+        {
+            isLoading = true;
+            errorMessage = "";
+            successMessage = "";
+            StateHasChanged();
+
+            bool result = await AuthService.RegisterAsync(fullName, email, password, "Admin");
+
+            if (result)
+            {
+                successMessage = "Account created successfully! Redirecting to login...";
+                StateHasChanged();
+                await Task.Delay(2000);
+                NavigationManager.NavigateTo("/login");
+            }
+            else
+            {
+                errorMessage = "Registration failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Error: " + ex.Message;
+            Console.WriteLine("REGISTER UI ERROR: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

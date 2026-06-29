@@ -1,0 +1,377 @@
+@using VendorHub.Models.Repositories
+@using VendorHub.Models.Classes
+@using VendorHub.Services
+@page "/admin/quotations"
+@layout AdminLayout
+@inject QuotationRepository QuotationRepo
+@inject VendorRepository VendorRepo
+@inject InvitationRepository InvitationRepo
+@inject IEmailService EmailService
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 style="color:var(--text-primary);font-weight:700;margin:0;">
+        <span class="bi bi-file-text me-2" style="color:var(--accent);"></span>Quotation Requests
+    </h3>
+    <button class="btn btn-primary" @onclick="() => showModal = true">
+        <span class="bi bi-plus-lg"></span> New Request
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="toast toast-success" style="position:static;margin-bottom:16px;animation:none;">
+        @successMessage
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="toast toast-error" style="position:static;margin-bottom:16px;animation:none;">
+        @errorMessage
+    </div>
+}
+
+@if (isLoading)
+{
+    <div style="color:var(--accent);text-align:center;padding:40px;">
+        Loading quotation requests...
+    </div>
+}
+else if (quotations == null || !quotations.Any())
+{
+    <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+        No quotation requests found. Click "New Request" to create one.
+    </div>
+}
+else
+{
+    <table class="table-custom">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Deadline</th>
+                <th>Budget</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var q in quotations)
+            {
+                <tr>
+                    <td>@q.Id</td>
+                    <td style="font-weight:600;">@q.Title</td>
+                    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        @q.Description
+                    </td>
+                    <td>@(q.Deadline?.ToString("MMM dd, yyyy") ?? "—")</td>
+                    <td>@(q.Budget.HasValue ? $"${q.Budget:N2}" : "—")</td>
+                    <td><span class="badge badge-@(q.Status?.ToLower() ?? "pending")">@(q.Status ?? "Pending")</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" @onclick="() => OpenAssignModal(q)">
+                            Assign
+                        </button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteRequest(q.QuotationRequestId)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="() => showModal = false">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h5>New Quotation Request</h5>
+                <button class="modal-close" @onclick="() => showModal = false">&times;</button>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input class="form-control" @bind="title" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" rows="3" @bind="description"></textarea>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Deadline</label>
+                    <input class="form-control" type="date" @bind="deadline" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Budget ($)</label>
+                    <input class="form-control" type="number" step="0.01" @bind="budget" />
+                </div>
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" @onclick="() => showModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="HandleCreateRequest">Create</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showAssignModal && assignQuotation != null)
+{
+    <div class="modal-overlay" @onclick="() => showAssignModal = false">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h5>Assign Vendor — @assignQuotation.Title</h5>
+                <button class="modal-close" @onclick="() => showAssignModal = false">&times;</button>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Select Vendor</label>
+                <select class="form-select" @bind="selectedVendorId">
+                    <option value="0">-- Select a vendor --</option>
+                    @foreach (var v in vendorList)
+                    {
+                        <option value="@v.VendorId">@v.VendorName (@v.CompanyName — @v.EmailAddress)</option>
+                    }
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Your Email (Sender)</label>
+                <input type="email" class="form-control" @bind="senderEmail" placeholder="you@company.com" required />
+                @if (!string.IsNullOrEmpty(senderEmailError))
+                {
+                    <div class="validation-error">@senderEmailError</div>
+                }
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-secondary" @onclick="() => showAssignModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="AssignAndSendInvitation" disabled="@isAssigning">
+                    @(isAssigning ? "Sending..." : "Assign & Send Invitation")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<QuotationRequest> quotations = new List<QuotationRequest>();
+    private bool isLoading = true;
+    private string errorMessage = "";
+    private string successMessage = "";
+    private bool showModal = false;
+
+    private string title = "";
+    private string description = "";
+    private DateTime deadline = DateTime.Today.AddDays(7);
+    private decimal? budget = null;
+
+    private bool showAssignModal = false;
+    private QuotationRequest? assignQuotation = null;
+    private int selectedVendorId = 0;
+    private bool isAssigning = false;
+    private string senderEmail = "";
+    private string senderEmailError = "";
+    private List<Vendor> vendorList = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                if (!AuthState.IsLoggedIn)
+                {
+                    var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                    if (!roleResult.Success || roleResult.Value != "Admin")
+                    {
+                        NavigationManager.NavigateTo("/login", forceLoad: true);
+                        return;
+                    }
+                    var idResult = await SessionStorage.GetAsync<string>("UserId");
+                    var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                    var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+                    AuthState.SetUser(
+                        idResult.Success ? idResult.Value ?? "" : "",
+                        nameResult.Success ? nameResult.Value ?? "" : "",
+                        roleResult.Value ?? "",
+                        emailResult.Success ? emailResult.Value ?? "" : ""
+                    );
+                }
+
+                if (AuthState.UserRole != "Admin")
+                {
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+
+                quotations = await QuotationRepo.GetAllRequestsAsync();
+                Console.WriteLine($"Quotations loaded: {quotations?.Count ?? 0}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"LOAD ERROR: {ex.Message}");
+                errorMessage = ex.Message;
+            }
+            finally
+            {
+                isLoading = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task LoadQuotations()
+    {
+        try
+        {
+            quotations = await QuotationRepo.GetAllRequestsAsync();
+            Console.WriteLine($"Quotations refreshed: {quotations?.Count ?? 0}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"REFRESH ERROR: {ex.Message}");
+            quotations = new List<QuotationRequest>();
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleCreateRequest()
+    {
+        try
+        {
+            var request = new QuotationRequest
+            {
+                Title = title,
+                Description = description,
+                Deadline = deadline,
+                Budget = budget,
+                Status = "Pending",
+                CreatedDate = DateTime.UtcNow,
+                CompanyId = AuthState.CompanyId
+            };
+
+            QuotationRepo.CreateQuotationRequest(request);
+            successMessage = "Quotation request created successfully!";
+            StateHasChanged();
+            await Task.Delay(1500);
+            showModal = false;
+            quotations = await QuotationRepo.GetAllRequestsAsync();
+            successMessage = "";
+            title = "";
+            description = "";
+            deadline = DateTime.Today.AddDays(7);
+            budget = null;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Error creating request: " + ex.Message;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenAssignModal(QuotationRequest q)
+    {
+        assignQuotation = q;
+        selectedVendorId = 0;
+        senderEmail = AuthState.UserEmail;
+        senderEmailError = "";
+        vendorList = VendorRepo.GetAllVendors();
+        showAssignModal = true;
+    }
+
+    private async Task AssignAndSendInvitation()
+    {
+        if (assignQuotation == null || selectedVendorId == 0) return;
+
+        senderEmailError = "";
+        if (string.IsNullOrWhiteSpace(senderEmail) || !senderEmail.Contains('@') || !senderEmail.Contains('.'))
+        {
+            senderEmailError = "Please enter a valid email address.";
+            StateHasChanged();
+            return;
+        }
+
+        isAssigning = true;
+        errorMessage = "";
+        StateHasChanged();
+
+        try
+        {
+            var vendor = VendorRepo.GetVendorById(selectedVendorId);
+            if (vendor == null)
+            {
+                errorMessage = "Selected vendor not found.";
+                isAssigning = false;
+                StateHasChanged();
+                return;
+            }
+
+            var token = Guid.NewGuid().ToString("N");
+
+            var assignment = new QuotationAssignment
+            {
+                QuotationRequestId = assignQuotation.QuotationRequestId,
+                VendorId = vendor.VendorId,
+                Status = "Invited",
+                AssignedAt = DateTime.UtcNow,
+                InvitationSentAt = DateTime.UtcNow
+            };
+            await InvitationRepo.CreateAssignmentAsync(assignment);
+
+            var invitation = new VendorInvitation
+            {
+                Token = token,
+                Email = vendor.EmailAddress,
+                VendorName = vendor.VendorName,
+                VendorId = vendor.VendorId,
+                QuotationRequestId = assignQuotation.QuotationRequestId,
+                IsUsed = false,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddHours(48)
+            };
+            await InvitationRepo.CreateInvitationAsync(invitation);
+
+            var link = $"{NavigationManager.BaseUri}vendor/register?token={token}";
+            await EmailService.SendInvitationEmailAsync(vendor.EmailAddress, vendor.VendorName, assignQuotation.Title, link, senderEmail);
+
+            successMessage = $"Invitation sent to {vendor.VendorName} ({vendor.EmailAddress})!";
+            showAssignModal = false;
+            StateHasChanged();
+            await Task.Delay(3000);
+            successMessage = "";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ASSIGN ERROR: {ex.Message}");
+            errorMessage = $"Error: {ex.Message}";
+            StateHasChanged();
+        }
+        finally
+        {
+            isAssigning = false;
+        }
+    }
+
+    private async Task DeleteRequest(int id)
+    {
+        try
+        {
+            QuotationRepo.DeleteQuotationRequest(id);
+            await LoadQuotations();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DELETE ERROR: {ex.Message}");
+        }
+    }
+
+
+}

@@ -1,0 +1,87 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using VendorHub.Models.Classes;
+using VendorHub.Models.Repositories;
+
+namespace VendorHub.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class VendorResponseController : ControllerBase
+    {
+        private readonly VendorResponseRepository _repo = new VendorResponseRepository();
+
+        [Authorize(Roles = "Vendor")]
+        [HttpGet("assigned/{vendorId}")]
+        public IActionResult GetAssignedRequests(int vendorId)
+        {
+            try
+            {
+                var requests = _repo.GetAssignedRequests(vendorId);
+                return Ok(requests);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching assigned requests.", error = ex.Message });
+            }
+        }
+
+        [Authorize(Roles = "Vendor")]
+        [HttpPost("submit")]
+        public IActionResult SubmitResponse([FromBody] VendorResponseDto dto)
+        {
+            if (dto == null || dto.Price <= 0)
+                return BadRequest(new { message = "Invalid response data." });
+            try
+            {
+                var response = new VendorResponse
+                {
+                    QuotationAssignmentId = dto.QuotationAssignmentId,
+                    VendorId = dto.VendorId,
+                    Price = dto.Price,
+                    Notes = dto.Notes,
+                    DeliveryTimeDays = dto.DeliveryTimeDays
+                };
+                int id = _repo.SubmitResponse(response);
+                return Ok(new { message = "Response submitted successfully.", responseId = id });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error submitting response.", error = ex.Message });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("by-quotation/{assignmentId}")]
+        public IActionResult GetResponsesByQuotation(int assignmentId)
+        {
+            try
+            {
+                var responses = _repo.GetResponsesByQuotationAssignment(assignmentId);
+                return Ok(responses);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error fetching responses.", error = ex.Message });
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("approve/{responseId}")]
+        public IActionResult ApproveResponse(int responseId, [FromQuery] int quotationRequestId)
+        {
+            try
+            {
+                _repo.UpdateStatus(responseId, "Approved");
+                _repo.RejectOtherResponses(quotationRequestId, responseId);
+                return Ok(new { message = "Response approved successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error approving response.", error = ex.Message });
+            }
+        }
+    }
+}

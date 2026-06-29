@@ -1,0 +1,112 @@
+@using VendorHub.Models.Repositories
+@using VendorHub.Services
+@using VendorHub.Models.Classes
+@page "/"
+@page "/login"
+@layout LoginLayout
+@inject AuthRepository AuthService
+@inject InvitationRepository InvitationRepo
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+@inject AuthStateService AuthState
+
+<div class="split-auth">
+    <div class="split-auth-left">
+        <div class="auth-top-logo">
+            <Logo Size="Logo.LogoSize.Medium" />
+        </div>
+        <div class="auth-content">
+            <h1 class="auth-heading">IngressQuote</h1>
+            <p class="auth-subheading">Your Gateway to Smart Procurement</p>
+            <p class="auth-description">Compare vendor quotes, manage procurement requests, and make data-driven purchasing decisions — all from one streamlined platform.</p>
+        </div>
+        <div class="quote-box">
+            <div class="quote-text">"The best procurement is not just about cost — it's about finding the right partner at the right value."</div>
+            <div class="quote-author">— IngressQuote</div>
+        </div>
+        <div class="auth-footer-text">&copy; @DateTime.Now.Year IngressQuote. All rights reserved.</div>
+    </div>
+    <div class="split-auth-right">
+        <div class="form-card">
+            <h3>Welcome Back</h3>
+            <div class="form-subtitle">Sign in to your account to continue</div>
+            <div class="mb-3">
+                <label class="form-label">Email Address</label>
+                <input type="email" class="form-control" @bind="email" placeholder="Enter your email" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-control" @bind="password" placeholder="Enter your password" />
+            </div>
+            <button class="btn btn-primary w-100" @onclick="HandleLogin" disabled="@isLoading">
+                @(isLoading ? "Signing in..." : "Sign In")
+            </button>
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="mt-3" style="color:#FCA5A5;padding:10px;margin-top:10px;background:#7F1D1D;border-radius:8px;font-size:14px;text-align:center;">
+                    @errorMessage
+                </div>
+            }
+            <div style="text-align:center;margin-top:1.5rem;">
+                <span style="color:#94A3B8;font-size:0.85rem;">Don't have an account?</span>
+                <a href="/admin/register" class="auth-link" style="font-size:0.85rem;margin-left:0.5rem;">Register</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string email = "";
+    private string password = "";
+    private string errorMessage = "";
+    private bool isLoading = false;
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = "";
+            StateHasChanged();
+
+            var user = await AuthService.LoginAsync(email, password);
+
+            if (user == null)
+            {
+                errorMessage = "Invalid email or password.";
+                return;
+            }
+
+            await SessionStorage.SetAsync("UserId", user.UserId.ToString());
+            await SessionStorage.SetAsync("UserRole", user.Role);
+            await SessionStorage.SetAsync("UserName", user.Username);
+            await SessionStorage.SetAsync("UserEmail", user.Email);
+
+            int vendorId = 0;
+            if (user.Role == "Vendor")
+            {
+                var vendor = await InvitationRepo.GetVendorByEmailAsync(user.Email);
+                if (vendor != null)
+                    vendorId = vendor.VendorId;
+                await SessionStorage.SetAsync("VendorId", vendorId.ToString());
+            }
+
+            AuthState.SetUser(user.UserId.ToString(), user.Username, user.Role, user.Email, 1, vendorId);
+
+            NavigationManager.NavigateTo(
+                user.Role == "Admin" ? "/admin/dashboard" : "/vendor/dashboard",
+                forceLoad: true
+            );
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Login error: " + ex.Message;
+            Console.WriteLine("LOGIN ERROR: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

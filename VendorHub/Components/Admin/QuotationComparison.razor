@@ -1,0 +1,147 @@
+@using VendorHub.Models.Repositories
+@using VendorHub.Services
+@page "/admin/comparison"
+@layout AdminLayout
+@inject QuotationRepository QuotationRepo
+@inject AuthStateService AuthState
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 style="color:var(--text-primary);font-weight:700;margin:0;">
+        <span class="bi bi-bar-chart me-2" style="color:var(--accent);"></span>Smart Comparison
+    </h3>
+    <div>
+        <select class="form-select" @bind="selectedRequestId" @bind:after="LoadComparison">
+            <option value="0">-- Select Quotation Request --</option>
+            @foreach (var q in quotationRequests)
+            {
+                <option value="@q.QuotationRequestId">@q.RequestTitle</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (responses != null && responses.Any())
+{
+    <div class="summary-bar mb-4">
+        <div class="summary-item">
+            <div class="label">Best Price</div>
+            <div class="value">$@bestPrice.ToString("F2") by @bestPriceVendor</div>
+        </div>
+    </div>
+
+    <table class="table-custom">
+        <thead>
+            <tr>
+                <th>Vendor</th>
+                <th>Company</th>
+                <th>Price ($)</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in responses)
+            {
+                <tr class="@(r.QuotationAmount == bestPrice ? "highlight-row" : "")">
+                    <td style="font-weight:600;">@r.VendorName</td>
+                    <td>@r.VendorCompanyName</td>
+                    <td style="font-weight:600;color:var(--accent);">$@r.QuotationAmount.ToString("F2")</td>
+                    <td><span class="badge badge-@r.Status.ToLower()">@r.Status</span></td>
+                    <td>
+                        @if (r.Status != "Approved" && r.Status != "Rejected")
+                        {
+                            <button class="btn btn-sm btn-primary" @onclick="() => ApproveResponse(r.QuotationId)">Approve</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else if (selectedRequestId > 0)
+{
+    <div style="text-align:center;padding:3rem;color:var(--text-muted);">No responses yet for this quotation request.</div>
+}
+
+@code {
+    private int selectedRequestId;
+    private List<SummaryItem> quotationRequests = new();
+    private List<ComparisonRow> responses = new();
+    private decimal bestPrice;
+    private string bestPriceVendor = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!AuthState.IsLoggedIn)
+            {
+                var roleResult = await SessionStorage.GetAsync<string>("UserRole");
+                if (!roleResult.Success || roleResult.Value != "Admin")
+                {
+                    NavigationManager.NavigateTo("/login", forceLoad: true);
+                    return;
+                }
+                var idResult = await SessionStorage.GetAsync<string>("UserId");
+                var nameResult = await SessionStorage.GetAsync<string>("UserName");
+                var emailResult = await SessionStorage.GetAsync<string>("UserEmail");
+                AuthState.SetUser(
+                    idResult.Success ? idResult.Value ?? "" : "",
+                    nameResult.Success ? nameResult.Value ?? "" : "",
+                    roleResult.Value ?? "",
+                    emailResult.Success ? emailResult.Value ?? "" : ""
+                );
+            }
+
+            var summaries = QuotationRepo.GetSimpleQuotationSummaries(AuthState.CompanyId);
+            quotationRequests = summaries.Select(s => new SummaryItem
+            {
+                QuotationRequestId = s.QuotationRequestId,
+                RequestTitle = s.RequestTitle
+            }).DistinctBy(s => s.QuotationRequestId).ToList();
+        }
+    }
+
+    private async Task LoadComparison()
+    {
+        if (selectedRequestId <= 0) return;
+        var comparison = QuotationRepo.CompareVendorsByRequestId(selectedRequestId);
+        responses = comparison.Select(c => new ComparisonRow
+        {
+            QuotationId = c.QuotationId,
+            VendorName = c.VendorName,
+            VendorCompanyName = c.VendorCompanyName,
+            QuotationAmount = c.QuotationAmount,
+            Status = c.Status
+        }).ToList();
+
+        if (responses.Any())
+        {
+            bestPrice = responses.Min(r => r.QuotationAmount);
+            bestPriceVendor = responses.First(r => r.QuotationAmount == bestPrice).VendorName;
+        }
+    }
+
+    private async Task ApproveResponse(int quotationId)
+    {
+        QuotationRepo.UpdateQuotationStatus(quotationId, "Approved");
+        await LoadComparison();
+    }
+
+    private class SummaryItem
+    {
+        public int QuotationRequestId { get; set; }
+        public string RequestTitle { get; set; } = "";
+    }
+
+    private class ComparisonRow
+    {
+        public int QuotationId { get; set; }
+        public string VendorName { get; set; } = "";
+        public string VendorCompanyName { get; set; } = "";
+        public decimal QuotationAmount { get; set; }
+        public string Status { get; set; } = "";
+    }
+}
