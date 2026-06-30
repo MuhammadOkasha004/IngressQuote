@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="IngressQuote — Vendor Management & Quotation System" src="./VendorHub/wwwroot/favicon.ico" width="100" style="border-radius: 16px;">
+  <img alt="IngressQuote — Vendor Management & Quotation System" src="./VendorHub/wwwroot/logo.png" width="100" style="border-radius: 16px;">
 </p>
 
 <h1 align="center">Ingress<span style="color:#00b8a9">Quote</span></h1>
